@@ -10,9 +10,15 @@
 //------------------------------------------------------------------------------
 
 //Libraries
+// Sensor Humedad Ambiente
 #include <DHT.h>
+
+// Reloj
 #include <DS3231.h>
+
 #include <SPI.h>
+
+// Tarjeta SD
 #include <SD.h>
 
 //Constants
@@ -38,9 +44,12 @@ SdVolume volume;
 SdFile root;
 const int chipSelect = 53;
 File myFile;
-File myFile2;
-File myFile3;
 
+//Configuration
+String luz_cantidad_horas;
+String luz_horario_encendido;
+String riego_cantidad_agua;
+String riego_cada_cantidad_horas;
 
 // Init the DS3231 using the hardware interface
 DS3231  rtc(SDA, SCL);
@@ -49,6 +58,7 @@ DS3231  rtc(SDA, SCL);
 void setup()
 {
     Serial.begin(9600);
+
     //Sensor ambiente
     dht.begin();
     SD.begin(53);
@@ -56,205 +66,183 @@ void setup()
     //Reloj
     rtc.begin();
 
-    // The following lines can be uncommented to set the date and time
+    // Aca se puede configurar el reloj
     //rtc.setDOW(SATURDAY);     // Set Day-of-Week to SUNDAY
     //rtc.setTime(00, 42, 20);     // Set the time to 12:00:00 (24hr format)
     //rtc.setDate(2, 7, 2016);   // Set the date to January 1st, 2014
 
+    // Ping 10 indica la luz encendida
     pinMode(10, OUTPUT);
+
+    // Pin 53 es utilizado por la SD para escribir
     pinMode(53, OUTPUT);
 
-    Serial.print("\nInitializing SD card...");
+    Serial.println("Inicializando tarjeta SD...");
 
-  // we'll use the initialization code from the utility libraries
-  // since we're just testing if the card is working!
+
   if (!card.init(SPI_HALF_SPEED, chipSelect)) {
-    Serial.println("initialization failed. Things to check:");
-    Serial.println("* is a card inserted?");
-    Serial.println("* is your wiring correct?");
-    Serial.println("* did you change the chipSelect pin to match your shield or module?");
+    Serial.println("[ERROR] No se pudo leer la memoria SD.");
+
     return;
   } else {
-    Serial.println("Wiring is correct and a card is present.");
-  }
-
-  // print the type of card
-  Serial.print("\nCard type: ");
-  switch (card.type()) {
-    case SD_CARD_TYPE_SD1:
-      Serial.println("SD1");
-      break;
-    case SD_CARD_TYPE_SD2:
-      Serial.println("SD2");
-      break;
-    case SD_CARD_TYPE_SDHC:
-      Serial.println("SDHC");
-      break;
-    default:
-      Serial.println("Unknown");
+    Serial.println("[OK] Tarjeta SD funcionando.");
   }
 
   // Now we will try to open the 'volume'/'partition' - it should be FAT16 or FAT32
   if (!volume.init(card)) {
-    Serial.println("Could not find FAT16/FAT32 partition.\nMake sure you've formatted the card");
+    Serial.println("[ERROR] No se puede leer la SD. Esta formateada correctamente?");
     return;
   }
 
-
-  // print the type and size of the first FAT-type volume
-  uint32_t volumesize;
-  Serial.print("\nVolume type is FAT");
-  Serial.println(volume.fatType(), DEC);
-  Serial.println();
-
-  volumesize = volume.blocksPerCluster();    // clusters are collections of blocks
-  volumesize *= volume.clusterCount();       // we'll have a lot of clusters
-  volumesize *= 512;                            // SD card blocks are always 512 bytes
-  Serial.print("Volume size (bytes): ");
-  Serial.println(volumesize);
-  Serial.print("Volume size (Kbytes): ");
-  volumesize /= 1024;
-  Serial.println(volumesize);
-  Serial.print("Volume size (Mbytes): ");
-  volumesize /= 1024;
-  Serial.println(volumesize);
-
-
-  Serial.println("\nFiles found on the card (name, date and size in bytes): ");
-  root.openRoot(volume);
-
-  // list all files in the card with date and size
-  root.ls(LS_R | LS_DATE | LS_SIZE);
-
   myFile = SD.open("data.log", FILE_WRITE);
   if (myFile) {
-    // close the file:
-    //myFile.close();
-    Serial.println("data.log opened.");
+    Serial.println("[OK] Archivo de registro abierto.");
   } else {
-    // if the file didn't open, print an error:
-    Serial.println("error opening data.log");
+    Serial.println("[ERROR] No se pudo abrir el archivo de registro.");
   }
 
+  readSDSettings();
 
-  // re-open the file for reading:
-  //myFile3 = SD.open("data.log", FILE_WRITE);
-  /*if (myFile3) {
-    Serial.println("data.log:");
+}
 
-    // read from the file until there's nothing else in it:
-    while (myFile.available()) {
-      Serial.write(myFile.read());
-    }
-    // close the file:
-    myFile.close();
-  } else {
-    // if the file didn't open, print an error:
-    Serial.println("error opening data.log");
-  }*/
+void readSDSettings(){
+     char character;
+     String settingName;
+     String settingValue;
+     myFile = SD.open("settings.ini");
+     if (myFile) {
+         while (myFile.available()) {
+             character = myFile.read();
+             while((myFile.available()) && (character != '[')){
+                 character = myFile.read();
+             }
+             character = myFile.read();
+             while((myFile.available()) && (character != '=')){
+                 settingName = settingName + character;
+                 character = myFile.read();
+             }
+             character = myFile.read();
+             while((myFile.available()) && (character != ']')){
+                 settingValue = settingValue + character;
+                 character = myFile.read();
+             }
+             if(character == ']'){
+
+                 //Debuuging Printing
+                 Serial.print("Name:");
+                 Serial.println(settingName);
+                 Serial.print("Value :");
+                 Serial.println(settingValue);
 
 
+                 applySetting(settingName,settingValue);
 
+                 // Reset Strings
+                 settingName = "";
+                 settingValue = "";
+             }
+         }
+         // Cierra el archivo:
+         myFile.close();
+     } else {
+         // si no se pudo abrir el archivo, aviso.
+         logDataln("[ERROR] No se pudo abrir el archivo de configuracion.");
+     }
+ }
+
+
+void applySetting(String settingName, String settingValue) {
+   if(settingName == "luz_cantidad_horas") {
+       luz_cantidad_horas=settingValue;
+   }
+   if(settingName == "luz_horario_encendido") {
+       luz_horario_encendido=settingValue;
+   }
+   if(settingName == "riego_cantidad_agua") {
+       riego_cantidad_agua=settingValue;
+   }
+   if(settingName == "riego_cada_cantidad_horas") {
+       riego_cada_cantidad_horas=settingValue;
+   }
+}
+
+void logDataln(String data){
+  Serial.println(data);
+  myFile.println(data);
+}
+
+void logData(String data){
+  Serial.print(data);
+  myFile.print(data);
 }
 
 void loop()
 {
-    myFile = SD.open("data.log", FILE_WRITE);
-    Serial.println("[-----------START-----------]");
-    myFile.println("[-----------START-----------]");
 
-     // Send Day-of-Week
-      Serial.print(rtc.getDOWStr());
-      myFile.println(rtc.getDOWStr());
-      Serial.print(" ");
-      myFile.println(" ");
+  myFile = SD.open("data.log", FILE_WRITE);
+  logDataln("[-----------START-----------]");
 
-      // Send date
-      Serial.print(rtc.getDateStr());
-      myFile.println(rtc.getDateStr());
-      Serial.print(" -- ");
-      myFile.println(" -- ");
+  // Mostrar dia de la semana
+  logDataln(rtc.getDOWStr());
 
-      // Send time
-      Serial.print("[");
-      myFile.println("[");
-      Serial.print(rtc.getTimeStr());
-      myFile.println(rtc.getTimeStr());
-      Serial.println("]");
-      myFile.println("]");
-
-    //Read data and store it to variables hum and temp
-    hum = dht.readHumidity();
-    temp= dht.readTemperature();
-    //Print temp and humidity values to serial monitor
-    Serial.print("Humidity: ");
-    myFile.println("Humidity: ");
-    Serial.print(hum);
-    myFile.println(hum);
-    Serial.println(" %");
-    myFile.println(" %");
-    Serial.print("Temp: ");
-    myFile.println("Temp: ");
-    Serial.print(temp);
-    myFile.println(temp);
-    Serial.println(" Celsius");
-    myFile.println(" Celsius");
+  // Mostrar fecha
+  logDataln(rtc.getDateStr());
 
 
 
+  // Mostrar hora
+  logDataln(rtc.getTimeStr());
 
-    Serial.print("Humedad sustrato:");
-    myFile.println("Humedad sustrato:");
-    valorHumedadTierra = analogRead(0);
-    valorHumedadTierraDigital = digitalRead(3);
-    Serial.print(valorHumedadTierra);
-    myFile.println(valorHumedadTierra);
-    Serial.print(" | ");
-    myFile.println(" | ");
-    Serial.print(valorHumedadTierraDigital);
-    myFile.println(valorHumedadTierraDigital);
-    Serial.println(" ");
-    myFile.println(" ");
+  // Sensar humedad y temperatura ambiente
+  hum = dht.readHumidity();
+  temp= dht.readTemperature();
 
-    if (valorHumedadTierra <= 300)
-       Serial.println(" Encharcado");
-       myFile.println(" Encharcado");
-    if ((valorHumedadTierra > 300) and (valorHumedadTierra <= 700))
-        Serial.println("Humedo, no regar");
-        myFile.println("Humedo, no regar");
-    if (valorHumedadTierra > 700)
-        Serial.println(" Seco, necesitas regar");
-        myFile.println(" Seco, necesitas regar");
+  // Logear humedad ambiente
+  logData("Humedad Ambiente: ");
+  logData(String(hum));
+  logDataln(" %");
 
+  // Logear temperatura ambiente
+  logData("Temperatura Ambiente: ");
+  logData(String(temp));
+  logDataln("° C");
 
+  // Sensar humedad del sustrato analogico
+  valorHumedadTierra = analogRead(0);
+  valorHumedadTierra = map(valorHumedadTierra, 0, 1024, 100, 0);
+  //valorHumedadTierra = valorHumedadTierra+100;
 
+  // Sensar humedad del sustrato digital
+  valorHumedadTierraDigital = digitalRead(3);
 
+  //Logear humedad del sustrato
+  logData("Humedad sustrato:");
+  logData(String(valorHumedadTierra));
+  logData("% | ");
+  logDataln(String(valorHumedadTierraDigital));
 
-    valorLuzDigital = digitalRead(4);
-    if(valorLuzDigital == 1){
-      Serial.print("Luz Apagada");
-      myFile.println("Luz Apagada");
-      digitalWrite(10, HIGH);   // turn the LED on (HIGH is the voltage level)
-    }
-    else{
-      Serial.print("Luz Prendida");
-      myFile.println("Luz Prendida");
-      digitalWrite(10, LOW);   // turn the LED on (HIGH is the voltage level)
-    }
-    Serial.println(" ");
-    myFile.println(" ");
+  if (valorHumedadTierra <= 300)
+     logDataln(" Encharcado");
+  if ((valorHumedadTierra > 300) and (valorHumedadTierra <= 700))
+      logDataln("Humedo, no regar");
+  if (valorHumedadTierra > 700)
+      logDataln(" Seco, necesitas regar");
 
-    /*if (valorLuz <= 300)
-       Serial.println(" Encharcado");
-    if ((valorLuz > 300) and (valorLuz <= 700))
-        Serial.println(" Humedo, no regar");
-    if (valorLuz > 700)
-        Serial.println(" Seco, necesitas regar");
-        */
-    Serial.println("[------------END------------]");
-    myFile.println("[------------END------------]");
-    Serial.println("[===========================]");
-    myFile.println("[===========================]");
-    myFile.close();
-    delay(60000); //Delay 1 min.
+  // Sensar luz
+  valorLuzDigital = digitalRead(4);
+
+  if(valorLuzDigital == 1){
+    logDataln("Luz Apagada");
+    digitalWrite(10, HIGH);   // turn the LED on (HIGH is the voltage level)
+  }
+  else{
+    logDataln("Luz Prendida");
+    digitalWrite(10, LOW);   // turn the LED on (HIGH is the voltage level)
+  }
+
+  logDataln("[------------END------------]");
+  logDataln("[===========================]");
+
+  myFile.close();
+  delay(60000); //Delay 1 min.
 }
