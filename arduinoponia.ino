@@ -44,12 +44,18 @@ SdVolume volume;
 SdFile root;
 const int chipSelect = 53;
 File myFile;
+File mySettingsFile;
 
 //Configuration
 String luz_cantidad_horas;
 String luz_horario_encendido;
+String luz_horario_apagado;
 String riego_cantidad_agua;
 String riego_cada_cantidad_horas;
+String today;
+String currentTime;
+bool regado = false;
+String hora_ultimo_riego;
 
 // Init the DS3231 using the hardware interface
 DS3231  rtc(SDA, SCL);
@@ -158,11 +164,17 @@ void applySetting(String settingName, String settingValue) {
    if(settingName == "luz_horario_encendido") {
        luz_horario_encendido=settingValue;
    }
+   if(settingName == "luz_horario_apagado") {
+       luz_horario_apagado=settingValue;
+   }
    if(settingName == "riego_cantidad_agua") {
        riego_cantidad_agua=settingValue;
    }
    if(settingName == "riego_cada_cantidad_horas") {
        riego_cada_cantidad_horas=settingValue;
+   }
+   if(settingName == "hora_ultimo_riego") {
+       hora_ultimo_riego=settingValue;
    }
 }
 
@@ -176,22 +188,26 @@ void logData(String data){
   myFile.print(data);
 }
 
-void loop()
-{
-
+void doLog(){
   myFile = SD.open("data.log", FILE_WRITE);
-  logDataln("[-----------START-----------]");
 
-  // Mostrar dia de la semana
-  logDataln(rtc.getDOWStr());
+  if(today.length()==0){
+    today = rtc.getDateStr();
+    logDataln("-----------[today.length()==0]-----------");
+    logDataln("-----------["+String(today)+"]-----------");
+  }
+  
+  if(today != rtc.getDateStr()){
+    today = rtc.getDateStr();
+    logDataln("-----------[today != rtc.getDateStr()]-----------");
+    logDataln("-----------["+String(today)+"]-----------");
+  }
 
-  // Mostrar fecha
-  logDataln(rtc.getDateStr());
-
-
-
+  // Trae la hora actual
+  currentTime = rtc.getTimeStr();
+  
   // Mostrar hora
-  logDataln(rtc.getTimeStr());
+  logDataln(currentTime);
 
   // Sensar humedad y temperatura ambiente
   hum = dht.readHumidity();
@@ -222,7 +238,7 @@ void loop()
   logDataln(String(valorHumedadTierraDigital));
 
   if (valorHumedadTierra <= 300)
-     logDataln(" Encharcado");
+     logDataln("Encharcado");
   if ((valorHumedadTierra > 300) and (valorHumedadTierra <= 700))
       logDataln("Humedo, no regar");
   if (valorHumedadTierra > 700)
@@ -240,9 +256,61 @@ void loop()
     digitalWrite(10, LOW);   // turn the LED on (HIGH is the voltage level)
   }
 
-  logDataln("[------------END------------]");
-  logDataln("[===========================]");
-
+  logDataln("[---------------------------]");
+  
   myFile.close();
+}
+
+void regar(){
+  logDataln("[Activo riego]");
+  logDataln("[---------------------------]");
+  delay(10000); //Delay 10 seg.
+  logDataln("[Desactivo riego]");
+  logDataln("[---------------------------]");
+}
+
+void loop()
+{
+  // Get hora actual
+  String horaActual = currentTime.substring(0, currentTime.indexOf(':'));
+
+  // Si es hora de prender la luz, la prendo
+  if(horaActual == luz_horario_encendido){
+    logDataln("[Encender luz]");
+    logDataln("[---------------------------]");
+  }
+
+  // Si es hora de apagar la luz, la apago
+  if(horaActual == luz_horario_apagado){
+    logDataln("[Apagar luz]");
+    logDataln("[---------------------------]");
+  }
+
+  if(hora_ultimo_riego.length() == 0){
+    regar();
+    hora_ultimo_riego = horaActual;
+    mySettingsFile = SD.open("settings.ini");
+    mySettingsFile.print("[");
+    mySettingsFile.print("hora_ultimo_riego=");
+    mySettingsFile.print(hora_ultimo_riego);
+    mySettingsFile.println("]");
+    mySettingsFile.close();
+  }
+  
+  if(horaActual != hora_ultimo_riego && horaActual == hora_ultimo_riego+riego_cada_cantidad_horas){
+    regar();
+    hora_ultimo_riego = horaActual;
+    mySettingsFile = SD.open("settings.ini");
+    mySettingsFile.print("[");
+    mySettingsFile.print("hora_ultimo_riego=");
+    mySettingsFile.print(hora_ultimo_riego);
+    mySettingsFile.println("]");
+    mySettingsFile.close();
+  }
+
+  
+  
+  doLog();
+  
   delay(60000); //Delay 1 min.
 }
