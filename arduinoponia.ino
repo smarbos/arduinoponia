@@ -49,6 +49,7 @@ File mySettingsFile;
 //Configuration
 int luz_horario_encendido;
 int luz_horario_apagado;
+int riego_umbral;
 String today;
 String currentTime;
 bool luz_prendida = false;
@@ -151,13 +152,18 @@ void readSDSettings(){
    }
  }
 
-
 void applySetting(String settingName, int settingValue) {
+  
    if(settingName == "luz_horario_encendido") {
        luz_horario_encendido=settingValue;
    }
+   
    if(settingName == "luz_horario_apagado") {
        luz_horario_apagado=settingValue;
+   }
+
+   if(settingName == "riego_umbral") {
+       riego_umbral=settingValue;
    }
 }
 
@@ -209,7 +215,6 @@ void doLog(){
   // Sensar humedad del sustrato analogico
   valorHumedadTierra = analogRead(0);
   valorHumedadTierra = map(valorHumedadTierra, 0, 1024, 100, 0);
-  //valorHumedadTierra = valorHumedadTierra+100;
 
   // Sensar humedad del sustrato digital
   valorHumedadTierraDigital = digitalRead(3);
@@ -219,13 +224,6 @@ void doLog(){
   logData(String(valorHumedadTierra));
   logData("% | ");
   logDataln(String(valorHumedadTierraDigital));
-
-  if (valorHumedadTierra <= 300)
-     logDataln("Encharcado");
-  if ((valorHumedadTierra > 300) and (valorHumedadTierra <= 700))
-      logDataln("Humedo, no regar");
-  if (valorHumedadTierra > 700)
-      logDataln(" Seco, necesitas regar");
 
   // Sensar luz
   valorLuzDigital = digitalRead(4);
@@ -291,7 +289,7 @@ void loop()
   }
 
   // Mido la humedad de la tierra y si es  menor a 50% y la luz esta apagada, riego.
-  if(valorHumedadTierra<50 && luz_prendida == false){
+  if(valorHumedadTierra<riego_umbral && luz_prendida == false){
     regar();  
   }
 
