@@ -47,15 +47,11 @@ File myFile;
 File mySettingsFile;
 
 //Configuration
-String luz_cantidad_horas;
-String luz_horario_encendido;
-String luz_horario_apagado;
-String riego_cantidad_agua;
-String riego_cada_cantidad_horas;
+int luz_horario_encendido;
+int luz_horario_apagado;
 String today;
 String currentTime;
-bool regado = false;
-String hora_ultimo_riego;
+bool luz_prendida = false;
 
 // Init the DS3231 using the hardware interface
 DS3231  rtc(SDA, SCL);
@@ -74,7 +70,7 @@ void setup()
 
     // Aca se puede configurar el reloj
     //rtc.setDOW(SATURDAY);     // Set Day-of-Week to SUNDAY
-    //rtc.setTime(00, 42, 20);     // Set the time to 12:00:00 (24hr format)
+    //rtc.setTime(20, 27, 00);     // Set the time to 12:00:00 (24hr format)
     //rtc.setDate(2, 7, 2016);   // Set the date to January 1st, 2014
 
     // Ping 10 indica la luz encendida
@@ -88,7 +84,6 @@ void setup()
 
   if (!card.init(SPI_HALF_SPEED, chipSelect)) {
     Serial.println("[ERROR] No se pudo leer la memoria SD.");
-
     return;
   } else {
     Serial.println("[OK] Tarjeta SD funcionando.");
@@ -112,69 +107,57 @@ void setup()
 }
 
 void readSDSettings(){
-     char character;
-     String settingName;
-     String settingValue;
-     myFile = SD.open("settings.ini");
-     if (myFile) {
-         while (myFile.available()) {
-             character = myFile.read();
-             while((myFile.available()) && (character != '[')){
-                 character = myFile.read();
-             }
-             character = myFile.read();
-             while((myFile.available()) && (character != '=')){
-                 settingName = settingName + character;
-                 character = myFile.read();
-             }
-             character = myFile.read();
-             while((myFile.available()) && (character != ']')){
-                 settingValue = settingValue + character;
-                 character = myFile.read();
-             }
-             if(character == ']'){
+   char character;
+   String settingName;
+   String settingValue;
+   myFile = SD.open("settings.ini");
+   if (myFile) {
+     while (myFile.available()) {
+       character = myFile.read();
+       while((myFile.available()) && (character != '[')){
+         character = myFile.read();
+       }
+       character = myFile.read();
+       while((myFile.available()) && (character != '=')){
+         settingName = settingName + character;
+         character = myFile.read();
+       }
+       character = myFile.read();
+       while((myFile.available()) && (character != ']')){
+         settingValue = settingValue + character;
+         character = myFile.read();
+       }
+       if(character == ']'){
 
-                 //Debuuging Printing
-                 Serial.print("Name:");
-                 Serial.println(settingName);
-                 Serial.print("Value :");
-                 Serial.println(settingValue);
+         //Debuuging Printing
+         Serial.print("Name:");
+         Serial.println(settingName);
+         Serial.print("Value :");
+         Serial.println(settingValue);
 
 
-                 applySetting(settingName,settingValue);
+         applySetting(settingName,settingValue.toInt());
 
-                 // Reset Strings
-                 settingName = "";
-                 settingValue = "";
-             }
-         }
-         // Cierra el archivo:
-         myFile.close();
-     } else {
-         // si no se pudo abrir el archivo, aviso.
-         logDataln("[ERROR] No se pudo abrir el archivo de configuracion.");
+         // Reset Strings
+         settingName = "";
+         settingValue = "";
+       }
      }
+     // Cierra el archivo:
+     myFile.close();
+   } else {
+       // si no se pudo abrir el archivo, aviso.
+       logDataln("[ERROR] No se pudo abrir el archivo de configuracion.");
+   }
  }
 
 
-void applySetting(String settingName, String settingValue) {
-   if(settingName == "luz_cantidad_horas") {
-       luz_cantidad_horas=settingValue;
-   }
+void applySetting(String settingName, int settingValue) {
    if(settingName == "luz_horario_encendido") {
        luz_horario_encendido=settingValue;
    }
    if(settingName == "luz_horario_apagado") {
        luz_horario_apagado=settingValue;
-   }
-   if(settingName == "riego_cantidad_agua") {
-       riego_cantidad_agua=settingValue;
-   }
-   if(settingName == "riego_cada_cantidad_horas") {
-       riego_cada_cantidad_horas=settingValue;
-   }
-   if(settingName == "hora_ultimo_riego") {
-       hora_ultimo_riego=settingValue;
    }
 }
 
@@ -248,12 +231,17 @@ void doLog(){
   valorLuzDigital = digitalRead(4);
 
   if(valorLuzDigital == 1){
-    logDataln("Luz Apagada");
-    digitalWrite(10, HIGH);   // turn the LED on (HIGH is the voltage level)
+    logDataln("Sensor Luz: Luz Apagada");
   }
   else{
-    logDataln("Luz Prendida");
-    digitalWrite(10, LOW);   // turn the LED on (HIGH is the voltage level)
+    logDataln("Sensor Luz: Luz Prendida");
+  }
+
+  if(luz_prendida){
+    logDataln("Estado de la luz: PRENDIDA");
+  }
+  else {
+    logDataln("Estado de la luz: APAGADA");
   }
 
   logDataln("[---------------------------]");
@@ -264,8 +252,22 @@ void doLog(){
 void regar(){
   logDataln("[Activo riego]");
   logDataln("[---------------------------]");
-  delay(10000); //Delay 10 seg.
+  //delay(5000); //Delay 5 seg.
   logDataln("[Desactivo riego]");
+  logDataln("[---------------------------]");
+}
+
+void prenderLuz(){
+  luz_prendida=true;
+  digitalWrite(10, HIGH);
+  logDataln("[Prendo luz]");
+  logDataln("[---------------------------]");
+}
+
+void apagarLuz(){
+  digitalWrite(10, LOW);
+  luz_prendida=false;
+  logDataln("[Apago luz]");
   logDataln("[---------------------------]");
 }
 
@@ -273,44 +275,28 @@ void loop()
 {
   // Get hora actual
   String horaActual = currentTime.substring(0, currentTime.indexOf(':'));
-
+  
+  //logDataln("Hora actual: "+String(horaActual));
+  //logDataln("Hora encendido luz: "+String(luz_horario_encendido));
+  //logDataln("Hora apagado luz: "+String(luz_horario_apagado));
+  
   // Si es hora de prender la luz, la prendo
-  if(horaActual == luz_horario_encendido){
-    logDataln("[Encender luz]");
-    logDataln("[---------------------------]");
+  if(horaActual.toInt()<luz_horario_apagado || horaActual.toInt()>=luz_horario_encendido){ //11<=22 || 11>10
+     prenderLuz();
   }
 
   // Si es hora de apagar la luz, la apago
-  if(horaActual == luz_horario_apagado){
-    logDataln("[Apagar luz]");
-    logDataln("[---------------------------]");
+  if(horaActual.toInt()>=luz_horario_apagado && horaActual.toInt()<luz_horario_encendido){ //00>10 && 00<22
+    apagarLuz();
   }
 
-  if(hora_ultimo_riego.length() == 0){
-    regar();
-    hora_ultimo_riego = horaActual;
-    mySettingsFile = SD.open("settings.ini");
-    mySettingsFile.print("[");
-    mySettingsFile.print("hora_ultimo_riego=");
-    mySettingsFile.print(hora_ultimo_riego);
-    mySettingsFile.println("]");
-    mySettingsFile.close();
-  }
-  
-  if(horaActual != hora_ultimo_riego && horaActual == hora_ultimo_riego+riego_cada_cantidad_horas){
-    regar();
-    hora_ultimo_riego = horaActual;
-    mySettingsFile = SD.open("settings.ini");
-    mySettingsFile.print("[");
-    mySettingsFile.print("hora_ultimo_riego=");
-    mySettingsFile.print(hora_ultimo_riego);
-    mySettingsFile.println("]");
-    mySettingsFile.close();
+  // Mido la humedad de la tierra y si es  menor a 50% y la luz esta apagada, riego.
+  if(valorHumedadTierra<50 && luz_prendida == false){
+    regar();  
   }
 
-  
-  
+  // Imprimo el registro al puerto serial y a data.log
   doLog();
   
-  delay(60000); //Delay 1 min.
+  delay(300000); //Delay 30 min.
 }
