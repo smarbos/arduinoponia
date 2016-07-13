@@ -29,8 +29,8 @@ DHT dht(DHTPIN, DHTTYPE); //// Initialize DHT sensor for normal 16mhz Arduino
 
 //Variables
 int chk;
-float hum;  //Stores humidity value
-float temp; //Stores temperature value
+float hum;
+float temp;
 
 int valorHumedadTierra;
 int valorHumedadTierraDigital;
@@ -71,7 +71,7 @@ void setup()
 
     // Aca se puede configurar el reloj
     //rtc.setDOW(SATURDAY);     // Set Day-of-Week to SUNDAY
-    //rtc.setTime(20, 27, 00);     // Set the time to 12:00:00 (24hr format)
+    rtc.setTime(20, 58, 50);     // Set the time to 12:00:00 (24hr format)
     //rtc.setDate(2, 7, 2016);   // Set the date to January 1st, 2014
 
     // Ping 10 indica la luz encendida
@@ -104,6 +104,8 @@ void setup()
   }
 
   readSDSettings();
+
+  revisarEstadoLuz();
 
 }
 
@@ -269,24 +271,23 @@ void apagarLuz(){
   logDataln("[---------------------------]");
 }
 
-void loop()
-{
+void revisarEstadoLuz(){
   // Get hora actual
   String horaActual = currentTime.substring(0, currentTime.indexOf(':'));
   
-  //logDataln("Hora actual: "+String(horaActual));
-  //logDataln("Hora encendido luz: "+String(luz_horario_encendido));
-  //logDataln("Hora apagado luz: "+String(luz_horario_apagado));
-  
-  // Si es hora de prender la luz, la prendo
-  if(horaActual.toInt()>=luz_horario_encendido && horaActual.toInt()<luz_horario_apagado){ // 20>=19 && 20<20
-     prenderLuz();
+  if(horaActual.toInt()>=luz_horario_encendido && horaActual.toInt()<luz_horario_apagado){
+    prenderLuz();
   }
-
-  // Si es hora de apagar la luz, la apago
-  if(horaActual.toInt()>=luz_horario_apagado){ // 20<19 && 20>=20
+  else{
     apagarLuz();
   }
+}
+
+void loop()
+{
+  
+  // Si es hora de prender la luz, la prendo
+  revisarEstadoLuz();
 
   // Mido la humedad de la tierra, si es  menor a riego_umbral y la luz esta apagada, riego.
   if(valorHumedadTierra<riego_umbral && luz_prendida == false){
