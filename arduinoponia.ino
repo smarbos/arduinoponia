@@ -279,16 +279,16 @@ void loop()
   //logDataln("Hora apagado luz: "+String(luz_horario_apagado));
   
   // Si es hora de prender la luz, la prendo
-  if(horaActual.toInt()<luz_horario_apagado || horaActual.toInt()>=luz_horario_encendido){ //11<=22 || 11>10
+  if(horaActual.toInt()>=luz_horario_encendido && horaActual.toInt()<luz_horario_apagado){ // 20>=19 && 20<20
      prenderLuz();
   }
 
   // Si es hora de apagar la luz, la apago
-  if(horaActual.toInt()>=luz_horario_apagado && horaActual.toInt()<luz_horario_encendido){ //00>10 && 00<22
+  if(horaActual.toInt()>=luz_horario_apagado){ // 20<19 && 20>=20
     apagarLuz();
   }
 
-  // Mido la humedad de la tierra y si es  menor a 50% y la luz esta apagada, riego.
+  // Mido la humedad de la tierra, si es  menor a riego_umbral y la luz esta apagada, riego.
   if(valorHumedadTierra<riego_umbral && luz_prendida == false){
     regar();  
   }
@@ -296,5 +296,5 @@ void loop()
   // Imprimo el registro al puerto serial y a data.log
   doLog();
   
-  delay(300000); //Delay 30 min.
+  delay(60000); //Delay 30 min.
 }
