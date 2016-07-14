@@ -297,7 +297,7 @@ void revisarEstadoLuz(){
   // Get hora actual
   String horaActual = currentTime.substring(0, currentTime.indexOf(':'));
   
-  if(false){
+  if(horaActual.toInt()>=luz_horario_encendido && horaActual.toInt()<luz_horario_apagado){
     prenderLuz();
   }
   else{
