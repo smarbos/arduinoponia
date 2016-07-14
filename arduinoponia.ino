@@ -71,7 +71,7 @@ void setup()
 
     // Aca se puede configurar el reloj
     //rtc.setDOW(SATURDAY);     // Set Day-of-Week to SUNDAY
-    rtc.setTime(20, 58, 50);     // Set the time to 12:00:00 (24hr format)
+    //rtc.setTime(20, 58, 50);     // Set the time to 12:00:00 (24hr format)
     //rtc.setDate(2, 7, 2016);   // Set the date to January 1st, 2014
 
     // Ping 10 indica la luz encendida
