@@ -21,6 +21,9 @@
 // Tarjeta SD
 #include <SD.h>
 
+// Servo
+#include <Servo.h>
+
 //Constants
 #define DHTPIN 2     // what pin we're connected to
 #define DHTTYPE DHT22   // DHT 22  (AM2302)
@@ -37,6 +40,10 @@ int valorHumedadTierraDigital;
 
 int valorLuz;
 int valorLuzDigital;
+
+// Servo
+Servo myservo;
+
 
 //------SD CARD-----//
 Sd2Card card;
@@ -250,10 +257,25 @@ void doLog(){
 }
 
 void regar(){
+  int pos = 0;
   logDataln("[Activo riego]");
+  myservo.attach(12);
+  for(pos = 0; pos < 50; pos += 1)  
+  {                                  
+    myservo.write(pos);              
+    delay(15);                       
+  }
   logDataln("[---------------------------]");
-  //delay(5000); //Delay 5 seg.
+  myservo.detach();
+  delay(5000); //Delay 5 seg.
+  myservo.attach(12);
   logDataln("[Desactivo riego]");
+  for(pos = 70; pos>=1; pos-=1)  
+  {                                
+    myservo.write(pos);              
+    delay(15);                       
+  }
+  myservo.detach();
   logDataln("[---------------------------]");
 }
 
@@ -275,7 +297,7 @@ void revisarEstadoLuz(){
   // Get hora actual
   String horaActual = currentTime.substring(0, currentTime.indexOf(':'));
   
-  if(horaActual.toInt()>=luz_horario_encendido && horaActual.toInt()<luz_horario_apagado){
+  if(false){
     prenderLuz();
   }
   else{
