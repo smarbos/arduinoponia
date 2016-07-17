@@ -41,6 +41,12 @@ int valorHumedadTierraDigital;
 int valorLuz;
 int valorLuzDigital;
 
+byte byteRead;
+long previousTime = 0;
+long interval = 60000;
+
+String current_mode = "default";
+
 // Servo
 Servo myservo;
 
@@ -57,6 +63,8 @@ File mySettingsFile;
 int luz_horario_encendido;
 int luz_horario_apagado;
 int riego_umbral;
+int temperatura_umbral_min;
+int temperatura_umbral_max;
 String today;
 String currentTime;
 bool luz_prendida = false;
@@ -77,9 +85,9 @@ void setup()
     rtc.begin();
 
     // Aca se puede configurar el reloj
-    //rtc.setDOW(SATURDAY);     // Set Day-of-Week to SUNDAY
+    //rtc.setDOW(SUNDAY);     // Set Day-of-Week to SUNDAY
     //rtc.setTime(20, 58, 50);     // Set the time to 12:00:00 (24hr format)
-    //rtc.setDate(2, 7, 2016);   // Set the date to January 1st, 2014
+    //rtc.setDate(17, 7, 2016);   // Set the date to January 1st, 2014
 
     // Ping 10 indica la luz encendida
     pinMode(10, OUTPUT);
@@ -112,8 +120,6 @@ void setup()
 
   readSDSettings();
 
-  revisarEstadoLuz();
-
 }
 
 void readSDSettings(){
@@ -140,6 +146,7 @@ void readSDSettings(){
        if(character == ']'){
 
          //Debuuging Printing
+         
          Serial.print("Name:");
          Serial.println(settingName);
          Serial.print("Value :");
@@ -159,20 +166,39 @@ void readSDSettings(){
        // si no se pudo abrir el archivo, aviso.
        logDataln("[ERROR] No se pudo abrir el archivo de configuracion.");
    }
+
+   Serial.println("Arduinoponio te escucha, ingresa un comando....");
  }
 
 void applySetting(String settingName, int settingValue) {
   
    if(settingName == "luz_horario_encendido") {
-       luz_horario_encendido=settingValue;
+       //luz_horario_encendido=settingValue;
+       luz_horario_encendido=0;
    }
    
    if(settingName == "luz_horario_apagado") {
-       luz_horario_apagado=settingValue;
+       //luz_horario_apagado=settingValue;
+       luz_horario_apagado=8;
    }
 
    if(settingName == "riego_umbral") {
        riego_umbral=settingValue;
+   }
+
+   if(settingName == "temperatura_umbral_min") {
+       //temperatura_umbral=settingValue;
+       temperatura_umbral_min=22;
+   }
+
+   if(settingName == "temperatura_umbral_max") {
+       //temperatura_umbral=settingValue;
+       temperatura_umbral_max=23;
+   }
+
+   if(settingName == "current_mode") {
+       //current_mode=settingValue;
+       current_mode="temperatura";
    }
 }
 
@@ -307,17 +333,96 @@ void revisarEstadoLuz(){
 
 void loop()
 {
-  
-  // Si es hora de prender la luz, la prendo
-  revisarEstadoLuz();
 
-  // Mido la humedad de la tierra, si es  menor a riego_umbral y la luz esta apagada, riego.
-  if(valorHumedadTierra<riego_umbral && luz_prendida == false){
-    regar();  
+  unsigned long currentTime = millis();
+
+  if(currentTime - previousTime > interval){
+    previousTime = currentTime;
+    
+    // Si es hora de prender la luz, la prendo
+    revisarEstadoLuz();
+  
+    // Mido la humedad de la tierra, si es  menor a riego_umbral y la luz esta apagada, riego.
+    if(valorHumedadTierra<riego_umbral && luz_prendida == false){
+      regar();  
+    }
+  
+    logDataln("[temp<temperatura_umbral_min]");
+    logDataln(String(temp<temperatura_umbral_min));
+  
+    logDataln("[temp]");
+    logDataln(String(temp));
+  
+    logDataln("[temperatura_umbral_min]");
+    logDataln(String(temperatura_umbral_min));
+    
+    // Mido la temperatura del ambiente, si es  menor a temperatura_umbral_min y la luz esta apagada, la prendo.
+    if(temp<=21 && luz_prendida == false){
+      prenderLuz();
+      logDataln("[La temperatura es muy baja, prendo la luz]");
+    }
+  
+    logDataln("[temp>temperatura_umbral_max]");
+    logDataln(String(temp>temperatura_umbral_max));
+    // Mido la temperatura del ambiente, si es  mayor a temperatura_umbral_max y la luz esta prendida, la apagago
+    if(temp>23 && luz_prendida == true){
+      apagarLuz();
+      logDataln("[La temperatura es correcta, apago la luz]");
+    }
+  
+    // Imprimo el registro al puerto serial y a data.log
+    doLog();
   }
+    
+    if (Serial.available()) {
+      /* read the most recent byte */
+      byteRead = Serial.read();
+      /*ECHO the value that was read, back to the serial port. */
+      switch(byteRead){
+        case 'h':
+          {
+             Serial.println("Ayuda");
+             break;
+          }
+          
+        
+        case '1':
+          {
+            Serial.println("[Current Mode is "+current_mode+"]");
+            Serial.println("Modos");
+            Serial.println("1) Automatico");
+            Serial.println("2) Manual");
+            break;
+          }
+          
 
-  // Imprimo el registro al puerto serial y a data.log
-  doLog();
+        case '2':
+          {
+            Serial.println("Estadoa actual");
+            Serial.println("");
+            Serial.println("");
+            break;
+          }
+          
+
+        case '3':
+          {
+            Serial.println("Acerca de...");
+            Serial.println("Arduinoponia 0.1");
+            Serial.println("https://github.com/smarbos/arduinoponia");
+             break;
+          }
+         
+        case '4':
+          {
+            Serial.print("Leyendo settings.ini:");
+   break;
   
-  delay(60000); //Delay 30 min.
+          }
+    
+      }
+      //Serial.write(byteRead);
+    }
+    
+  
 }
