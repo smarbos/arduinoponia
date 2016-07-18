@@ -45,7 +45,7 @@ byte byteRead;
 long previousTime = 0;
 long interval = 60000;
 
-String current_mode = "default";
+String current_mode = "temperatura";
 
 // Servo
 Servo myservo;
@@ -204,12 +204,12 @@ void applySetting(String settingName, int settingValue) {
 
 void logDataln(String data){
   Serial.println(data);
-  myFile.println(data);
+  //myFile.println(data);
 }
 
 void logData(String data){
   Serial.print(data);
-  myFile.print(data);
+  //myFile.print(data);
 }
 
 void doLog(){
@@ -340,35 +340,42 @@ void loop()
     previousTime = currentTime;
     
     // Si es hora de prender la luz, la prendo
-    revisarEstadoLuz();
+    if(current_mode == "luz"){
+      revisarEstadoLuz();
+    }
   
     // Mido la humedad de la tierra, si es  menor a riego_umbral y la luz esta apagada, riego.
     if(valorHumedadTierra<riego_umbral && luz_prendida == false){
       regar();  
     }
   
-    logDataln("[temp<temperatura_umbral_min]");
-    logDataln(String(temp<temperatura_umbral_min));
+    //logDataln("[temp<temperatura_umbral_min]");
+    //logDataln(String(temp<temperatura_umbral_min));
   
-    logDataln("[temp]");
-    logDataln(String(temp));
+    //logDataln("[temp]");
+    //logDataln(String(temp));
   
-    logDataln("[temperatura_umbral_min]");
-    logDataln(String(temperatura_umbral_min));
+    //logDataln("[temperatura_umbral_min]");
+    //logDataln(String(temperatura_umbral_min));
+
+    if(current_mode == "temperatura"){
+      // Mido la temperatura del ambiente, si es  menor a temperatura_umbral_min y la luz esta apagada, la prendo.
+      if(temp<=21 && luz_prendida == false){
+        prenderLuz();
+        logDataln("[La temperatura es muy baja, prendo la luz]");
+      }
+
+      // Mido la temperatura del ambiente, si es  mayor a temperatura_umbral_max y la luz esta prendida, la apagago
+      if(temp>23 && luz_prendida == true){
+        apagarLuz();
+        logDataln("[La temperatura es correcta, apago la luz]");
+      }
+    }
     
-    // Mido la temperatura del ambiente, si es  menor a temperatura_umbral_min y la luz esta apagada, la prendo.
-    if(temp<=21 && luz_prendida == false){
-      prenderLuz();
-      logDataln("[La temperatura es muy baja, prendo la luz]");
-    }
   
-    logDataln("[temp>temperatura_umbral_max]");
-    logDataln(String(temp>temperatura_umbral_max));
-    // Mido la temperatura del ambiente, si es  mayor a temperatura_umbral_max y la luz esta prendida, la apagago
-    if(temp>23 && luz_prendida == true){
-      apagarLuz();
-      logDataln("[La temperatura es correcta, apago la luz]");
-    }
+    //logDataln("[temp>temperatura_umbral_max]");
+    //logDataln(String(temp>temperatura_umbral_max));
+    
   
     // Imprimo el registro al puerto serial y a data.log
     doLog();
@@ -384,14 +391,31 @@ void loop()
              Serial.println("Ayuda");
              break;
           }
+
+        case 'l':
+          {
+            doLog();
+            break;
+          }
           
         
         case '1':
           {
             Serial.println("[Current Mode is "+current_mode+"]");
             Serial.println("Modos");
-            Serial.println("1) Automatico");
-            Serial.println("2) Manual");
+            if(current_mode=="luz"){
+              Serial.println("[*] 1) Luz: Se prende y apaga la luz segun configuracion.");
+            }
+            else{
+              Serial.println("[ ] 1) Luz: Se prende y apaga la luz segun configuracion.");
+            }
+            if(current_mode=="temperatura"){
+              Serial.println("[*] 2) Temperatura: Se prende y apaga la luz para mantener la temperatura segun configuracion.");
+            }
+            else{
+              Serial.println("[ ] 2) Temperatura: Se prende y apaga la luz para mantener la temperatura segun configuracion.");
+            }
+            
             break;
           }
           
@@ -416,8 +440,7 @@ void loop()
         case '4':
           {
             Serial.print("Leyendo settings.ini:");
-   break;
-  
+            break;
           }
     
       }
